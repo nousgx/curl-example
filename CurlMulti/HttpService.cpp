@@ -1,12 +1,15 @@
 #include "HttpService.h"
-#include <functional>
+#include <stdlib.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 
-struct HttpCallback {
-    CURL* easyHandle;
-    std::function<void()> callback;
-};
+
+HttpService::HttpCallback::HttpCallback(CURL* easyHandle, std::function<void()> callback)
+    : easyHandle(easyHandle)
+    , callback(callback) {}
+
+
+
 
 HttpService& HttpService::GetInstance() {
     static HttpService httpService;
@@ -33,12 +36,18 @@ void HttpService::Cleanup() {
     curl_multi_cleanup(m_pMultiHandle);
 }
 
-void HttpService::GetAsync() {
+// TODO return future
+void HttpService::GetAsync(std::function<void()>& callback) {
     CURL* handle = SetupRequest();
 
     // Set options
     curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
     curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
+
+    HttpCallback httpCallback(handle, callback);
+    m_Callbacks.push_back(httpCallback);
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData);
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(httpCallback.buffer));
 
     // Add the handle to the multi stack
     curl_multi_add_handle(m_pMultiHandle, handle);
@@ -129,4 +138,13 @@ void HttpService::EventLoop() {
         }
     }
        
+}
+
+size_t HttpService::WriteData(char* data, size_t size, size_t nmemb, std::string* writerData) {
+    if (writerData == NULL)
+        return 0;
+
+    writerData->append(data, size * nmemb);
+
+    return size * nmemb;
 }

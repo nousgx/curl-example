@@ -31,15 +31,44 @@ void HttpService::Cleanup() {
     curl_multi_cleanup(m_pMultiHandle);
 }
 
-void HttpService::GetVoid() {
+std::future<std::string> HttpService::GetAsync() {
     CURL* handle = SetupRequest();
+
+    std::promise<std::string> promise;
+
+    temp.handle = handle;
+    temp.promise = std::move(promise);
 
     // Set options
     curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
     curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
 
-    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData);
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &temp);
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp.str));
+
+    // Add the handle to the multi stack
+    curl_multi_add_handle(m_pMultiHandle, handle);
+
+    // Perform the action
+    curl_multi_perform(m_pMultiHandle, &m_StillRunning);
+
+    return temp.promise.get_future();
+}
+
+void HttpService::GetVoid() {
+    CURL* handle = SetupRequest();
+
+    HttpRequest req;
+    req.handle = handle;
+
+    // temp = req;
+
+    // Set options
+    curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
+    curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
+
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp.str));
 
     // Add the handle to the multi stack
     curl_multi_add_handle(m_pMultiHandle, handle);
@@ -77,7 +106,9 @@ void HttpService::EventLoop() {
                 curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &url);
                 printf("R: %d - %s <%s>\n", msg->data.result, curl_easy_strerror(msg->data.result), url);
 
-                std::cout << temp << "\n";
+                //std::cout << temp.str << "\n";
+
+                temp.promise.set_value(temp.str);
 
                 // Cleanup after calling the callback
                 curl_multi_remove_handle(m_pMultiHandle, e);

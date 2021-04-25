@@ -15,15 +15,22 @@ public:
 
     //std::future<std::string> GetAsync();
     void GetVoid();
+    std::future<std::string> GetAsync();
     void PostAsync();
 
 private:
     HttpService();
 
+    struct HttpRequest {
+        CURL* handle = nullptr;
+        std::string str;
+        std::promise<std::string> promise;
+    };
+
 
     std::thread m_EventThread;
 
-    std::string temp;
+    HttpRequest temp;
 
     // TODO: Lock
     // Use list here due to O(1) erase of list compared to O(n) erase of vector

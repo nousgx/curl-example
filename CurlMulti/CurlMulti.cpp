@@ -10,7 +10,11 @@ int main()
 
     HttpService& httpService = HttpService::GetInstance();
 
-    httpService.GetVoid();
+    std::future<std::string> f1 = httpService.GetAsync();
+
+    std::cout << f1.get() << "\n";
+
+    //httpService.GetVoid();
 
    /* std::future<std::string> f1 = httpService.GetAsync();
 

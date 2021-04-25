@@ -39,21 +39,25 @@ void HttpService::Cleanup() {
 std::future<std::string> HttpService::GetAsync(std::string url) {
     std::promise<std::string> promise;
     auto httpRequest = std::make_shared<HttpRequestFuture>(std::move(promise));
-    SetupRequest(url, httpRequest);
+    SetupRequest(HttpMethodType::GET, url, httpRequest, "");
 
     return httpRequest->promise.get_future();
 }
 
 void HttpService::GetAsync(std::string url, std::function<void(std::string)> callback) {
     auto httpRequest = std::make_shared<HttpRequestCallback>(std::move(callback));
-    SetupRequest(url, httpRequest);
+    SetupRequest(HttpMethodType::GET, url, httpRequest, "");
 }
 
-void HttpService::PostAsync() {
+std::future<std::string> HttpService::PostAsync(std::string url, std::string body) {
+    std::promise<std::string> promise;
+    auto httpRequest = std::make_shared<HttpRequestFuture>(std::move(promise));
+    SetupRequest(HttpMethodType::POST, url, httpRequest, body);
 
+    return httpRequest->promise.get_future();
 }
 
-void HttpService::SetupRequest(std::string url, std::shared_ptr<HttpRequest> httpRequest) {
+void HttpService::SetupRequest(HttpMethodType method, std::string url, std::shared_ptr<HttpRequest> httpRequest, std::string body) {
     CURL* handle = curl_easy_init();
 
     // Set options
@@ -61,6 +65,16 @@ void HttpService::SetupRequest(std::string url, std::shared_ptr<HttpRequest> htt
 
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(httpRequest->str));
+
+    // Set up the POST fields for a POST request
+    httpRequest->body = body;
+    if (method == HttpMethodType::POST) {
+        struct curl_slist* chunk = NULL;
+        chunk = curl_slist_append(chunk, "Content-Type: application/json");
+
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, chunk);
+        curl_easy_setopt(handle, CURLOPT_POSTFIELDS, httpRequest->body.c_str());
+    }
 
     httpRequest->handle = handle;
 
@@ -105,9 +119,8 @@ void HttpService::EventLoop() {
                         ++it;
                     }
                 }
-
-
-                // Cleanup after calling the callback
+                // Cleanup after calling the callback (might move this to destructor? 
+                // but maybe not...)
                 curl_multi_remove_handle(m_pMultiHandle, e);
                 curl_easy_cleanup(e);
             }

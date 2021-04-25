@@ -20,6 +20,9 @@ int main()
 {
     HttpService& httpService = HttpService::GetInstance();
 
+    std::future<std::string> f5 = httpService.PostAsync("http://localhost:3000/", "{\"hi\" : \"there\"}");
+    std::cout << f5.get() << "\n";
+
     std::future<std::string> f1 = httpService.GetAsync("http://localhost:3000/");
 
     std::cout << f1.get() << "\n";

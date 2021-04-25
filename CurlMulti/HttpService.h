@@ -18,19 +18,21 @@ public:
     //void GetVoid();
     std::future<std::string> GetAsync(std::string url);
     void GetAsync(std::string url, std::function<void(std::string)> callback);
-    void PostAsync();
+
+    std::future<std::string> PostAsync(std::string url, std::string body);
 
 private:
     HttpService();
 
-    enum HttpRequestType {
-        Future,
-        Callback
+    enum HttpMethodType {
+        GET,
+        POST
     };
 
     struct HttpRequest {
         CURL* handle = nullptr;
         std::string str;
+        std::string body;  // we need this here because CURLOPT_POSTFIELDS doesn't copy the data https://stackoverflow.com/questions/48612613/c-libcurl-not-posting-data
         virtual void Callback() = 0;
 
         ~HttpRequest() {
@@ -75,7 +77,7 @@ private:
     int m_Run;
     int m_Transfers;
 
-    void SetupRequest(std::string url, std::shared_ptr<HttpRequest> httpRequest);
+    void SetupRequest(HttpMethodType method, std::string url, std::shared_ptr<HttpRequest> httpRequest, std::string body);
     void FinishRequest(CURL* handle);
 
     void EventLoop();

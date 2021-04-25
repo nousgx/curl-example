@@ -5,6 +5,17 @@
 #include "HttpService.h"
 
 
+class Foo {
+public:
+    void curl() {
+        HttpService::GetInstance().GetAsync(std::bind(&Foo::callback, this, std::placeholders::_1));
+    }
+
+    void callback(std::string a) {
+        std::cout << "FOO OOOOOOO!!!!\n";
+    }
+};
+
 int main()
 {
     std::cout << "Hello World!\n";
@@ -17,8 +28,13 @@ int main()
 
     httpService.GetAsync([](std::string a) { std::cout << "Testing callback\n" << "Received: string\n\t" << a; });
 
-
+    Foo foo;
+    foo.curl();
     //httpService.GetVoid();
+
+    Foo foo1;
+    foo1.curl();
+    foo.curl();
 
    /* std::future<std::string> f1 = httpService.GetAsync();
 

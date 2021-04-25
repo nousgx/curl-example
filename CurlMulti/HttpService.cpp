@@ -37,71 +37,41 @@ void HttpService::Cleanup() {
 }
 
 std::future<std::string> HttpService::GetAsync(std::string url) {
-    CURL* handle = SetupRequest();
-
     std::promise<std::string> promise;
+    auto httpRequest = std::make_shared<HttpRequestFuture>(std::move(promise));
+    SetupRequest(url, httpRequest);
 
-    auto temp = std::make_shared<HttpRequestFuture>(handle, std::move(promise));
-
-    // Set options
-    curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
-
-    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp->str));
-
-    // Add the handle to the multi stack
-    curl_multi_add_handle(m_pMultiHandle, handle);
-
-    // Perform the action
-    curl_multi_perform(m_pMultiHandle, &m_StillRunning);
-
-    m_Callbacks.push_back(temp);
-    m_Transfers++;
-
-    std::cout << "Use count: " << temp.use_count() << "\n";
-
-    return temp->promise.get_future();
+    return httpRequest->promise.get_future();
 }
 
 void HttpService::GetAsync(std::string url, std::function<void(std::string)> callback) {
-    CURL* handle = SetupRequest();
-
-    if (!handle) {
-        std::cout << "NULL Handle!!!\n";
-    }
-
-    std::promise<std::string> promise;
-
-    auto temp = std::make_shared<HttpRequestCallback>(handle, std::move(callback));
-
-    // Set options
-    curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
-
-    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp->str));
-
-    // Add the handle to the multi stack
-    curl_multi_add_handle(m_pMultiHandle, handle);
-
-    // Perform the action
-    curl_multi_perform(m_pMultiHandle, &m_StillRunning);
-
-    m_Callbacks.push_back(temp);
-    m_Transfers++;
-
-    std::cout << "Use count: " << temp.use_count() << "\n";
+    auto httpRequest = std::make_shared<HttpRequestCallback>(std::move(callback));
+    SetupRequest(url, httpRequest);
 }
 
 void HttpService::PostAsync() {
 
 }
 
-CURL* HttpService::SetupRequest() {
+void HttpService::SetupRequest(std::string url, std::shared_ptr<HttpRequest> httpRequest) {
     CURL* handle = curl_easy_init();
 
-    //m_pEasyHandles.push_back(handle);
+    // Set options
+    curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
 
-    return handle;
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(httpRequest->str));
+
+    httpRequest->handle = handle;
+
+    // Add the handle to the multi stack
+    curl_multi_add_handle(m_pMultiHandle, handle);
+
+    // Perform the action
+    curl_multi_perform(m_pMultiHandle, &m_StillRunning);
+
+    m_Callbacks.push_back(httpRequest);
+    m_Transfers++;
 }
 
 void HttpService::FinishRequest(CURL* handle) {

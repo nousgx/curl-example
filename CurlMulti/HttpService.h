@@ -31,10 +31,6 @@ private:
     struct HttpRequest {
         CURL* handle = nullptr;
         std::string str;
-
-        HttpRequest(CURL* handle) {
-            this->handle = handle;
-        }
         virtual void Callback() = 0;
 
         ~HttpRequest() {
@@ -45,8 +41,7 @@ private:
     struct HttpRequestFuture : public HttpRequest {
         std::promise<std::string> promise;
 
-        HttpRequestFuture(CURL* handle, std::promise<std::string> p)
-            : HttpRequest(handle) {
+        HttpRequestFuture(std::promise<std::string> p) {
             promise = std::move(p);
         }
 
@@ -58,8 +53,7 @@ private:
     struct HttpRequestCallback : public HttpRequest {
         std::function<void(std::string)> callback;
 
-        HttpRequestCallback(CURL* handle, std::function<void(std::string)> callback)
-            : HttpRequest(handle) {
+        HttpRequestCallback(std::function<void(std::string)> callback) {
             this->callback = std::move(callback);
         }
 
@@ -81,7 +75,7 @@ private:
     int m_Run;
     int m_Transfers;
 
-    CURL* SetupRequest();
+    void SetupRequest(std::string url, std::shared_ptr<HttpRequest> httpRequest);
     void FinishRequest(CURL* handle);
 
     void EventLoop();

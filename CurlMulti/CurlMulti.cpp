@@ -31,16 +31,18 @@ int main()
     foo.curl();
     //httpService.GetVoid();
 
-    //std::future<std::string> f3 = httpService.GetAsync("http://localhost:3000/delay/");
+    std::future<std::string> f3 = httpService.GetAsync("http://localhost:3000/delay/");
     std::future<std::string> f2 = httpService.GetAsync("http://localhost:3000/delay/");
 
 
     Foo foo1;
     foo1.curl();   
-    std::cout << f2.get() << "\n";
+
+    std::cout << f3.get() << "\n";
+
     foo.curl();
 
-
+    std::cout << f2.get() << "\n";
 
    /* std::future<std::string> f1 = httpService.GetAsync();
 

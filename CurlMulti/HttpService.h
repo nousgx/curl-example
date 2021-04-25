@@ -16,8 +16,8 @@ public:
 
     //std::future<std::string> GetAsync();
     //void GetVoid();
-    std::future<std::string> GetAsync();
-    void GetAsync(std::function<void(std::string)> callback);
+    std::future<std::string> GetAsync(std::string url);
+    void GetAsync(std::string url, std::function<void(std::string)> callback);
     void PostAsync();
 
 private:

@@ -21,6 +21,8 @@ HttpService::HttpService()  {
     m_StillRunning = 0;
     m_Run = 1;
 
+    curl_multi_setopt(m_pMultiHandle, CURLMOPT_MAXCONNECTS, (long)10);
+
     m_EventThread = std::thread(&HttpService::EventLoop, this);
 }
 
@@ -34,7 +36,7 @@ void HttpService::Cleanup() {
     curl_multi_cleanup(m_pMultiHandle);
 }
 
-std::future<std::string> HttpService::GetAsync() {
+std::future<std::string> HttpService::GetAsync(std::string url) {
     CURL* handle = SetupRequest();
 
     std::promise<std::string> promise;
@@ -42,8 +44,7 @@ std::future<std::string> HttpService::GetAsync() {
     auto temp = std::make_shared<HttpRequestFuture>(handle, std::move(promise));
 
     // Set options
-    curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
-    curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
+    curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
 
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp->str));
@@ -62,7 +63,7 @@ std::future<std::string> HttpService::GetAsync() {
     return temp->promise.get_future();
 }
 
-void HttpService::GetAsync(std::function<void(std::string)> callback) {
+void HttpService::GetAsync(std::string url, std::function<void(std::string)> callback) {
     CURL* handle = SetupRequest();
 
     if (!handle) {
@@ -74,8 +75,7 @@ void HttpService::GetAsync(std::function<void(std::string)> callback) {
     auto temp = std::make_shared<HttpRequestCallback>(handle, std::move(callback));
 
     // Set options
-    curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
-    curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
+    curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
 
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp->str));
@@ -121,11 +121,8 @@ void HttpService::EventLoop() {
                 curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &url);
                 printf("R: %d - %s <%s>\n", msg->data.result, curl_easy_strerror(msg->data.result), url);
 
-                //std::cout << temp.str << "\n";
-
                 for (auto it = m_Callbacks.begin(); it != m_Callbacks.end();) {
                     if ((*it)->handle == e) {
-                        std::cout << "Inside event loop use count: " << it->use_count() << "\n";
 
                         (*it)->Callback();
                         
@@ -133,6 +130,9 @@ void HttpService::EventLoop() {
                         m_Callbacks.erase(it);
                         m_Transfers--;
                         break;
+                    }
+                    else {
+                        ++it;
                     }
                 }
 

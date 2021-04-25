@@ -8,7 +8,7 @@
 class Foo {
 public:
     void curl() {
-        HttpService::GetInstance().GetAsync(std::bind(&Foo::callback, this, std::placeholders::_1));
+        HttpService::GetInstance().GetAsync("http://localhost:3000/", std::bind(&Foo::callback, this, std::placeholders::_1));
     }
 
     void callback(std::string a) {
@@ -18,23 +18,29 @@ public:
 
 int main()
 {
-    std::cout << "Hello World!\n";
-
     HttpService& httpService = HttpService::GetInstance();
 
-    std::future<std::string> f1 = httpService.GetAsync();
+    std::future<std::string> f1 = httpService.GetAsync("http://localhost:3000/");
 
     std::cout << f1.get() << "\n";
 
-    httpService.GetAsync([](std::string a) { std::cout << "Testing callback\n" << "Received: string\n\t" << a; });
+
+    httpService.GetAsync("http://localhost:3000/", [](std::string a) { std::cout << "Testing callback\n" << "Received: string\n\t" << a; });
 
     Foo foo;
     foo.curl();
     //httpService.GetVoid();
 
+    //std::future<std::string> f3 = httpService.GetAsync("http://localhost:3000/delay/");
+    std::future<std::string> f2 = httpService.GetAsync("http://localhost:3000/delay/");
+
+
     Foo foo1;
-    foo1.curl();
+    foo1.curl();   
+    std::cout << f2.get() << "\n";
     foo.curl();
+
+
 
    /* std::future<std::string> f1 = httpService.GetAsync();
 

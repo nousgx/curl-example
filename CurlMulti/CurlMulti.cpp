@@ -10,8 +10,16 @@ int main()
 
     HttpService& httpService = HttpService::GetInstance();
 
-    httpService.GetAsync();
-    httpService.GetAsync();
+    httpService.GetVoid();
+
+   /* std::future<std::string> f1 = httpService.GetAsync();
+
+    try {
+        std::cout << f1.get() << "\n";
+    }
+    catch (const std::future_error & e) {
+        std::cout << "Caught a future_error with code\"" << e.code() << "\"\nMessage: \"" << e.what() << "\"\n";
+    }*/
 
 
     Sleep(100000);

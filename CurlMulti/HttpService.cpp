@@ -1,14 +1,9 @@
 #include "HttpService.h"
-#include <stdlib.h>
+#include <memory>
+#include <iostream>
+
 
 #pragma comment(lib, "Ws2_32.lib")
-
-
-HttpService::HttpCallback::HttpCallback(CURL* easyHandle, std::function<void()> callback)
-    : easyHandle(easyHandle)
-    , callback(callback) {}
-
-
 
 
 HttpService& HttpService::GetInstance() {
@@ -36,18 +31,15 @@ void HttpService::Cleanup() {
     curl_multi_cleanup(m_pMultiHandle);
 }
 
-// TODO return future
-void HttpService::GetAsync(std::function<void()>& callback) {
+void HttpService::GetVoid() {
     CURL* handle = SetupRequest();
 
     // Set options
     curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
     curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
 
-    HttpCallback httpCallback(handle, callback);
-    m_Callbacks.push_back(httpCallback);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData);
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(httpCallback.buffer));
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &temp);
 
     // Add the handle to the multi stack
     curl_multi_add_handle(m_pMultiHandle, handle);
@@ -73,7 +65,26 @@ void HttpService::FinishRequest(CURL* handle) {
 }
 
 void HttpService::EventLoop() {
+    CURLMsg* msg;
+    int msgs_left = -1;
+
     while (1) {
+        // Get which messages are done
+        while ((msg = curl_multi_info_read(m_pMultiHandle, &msgs_left))) {
+            if (msg->msg == CURLMSG_DONE) {
+                char* url;
+                CURL* e = msg->easy_handle;
+                curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &url);
+                printf("R: %d - %s <%s>\n", msg->data.result, curl_easy_strerror(msg->data.result), url);
+
+                std::cout << temp << "\n";
+
+                // Cleanup after calling the callback
+                curl_multi_remove_handle(m_pMultiHandle, e);
+                curl_easy_cleanup(e);
+            }
+        }
+
         printf("Running event loop: %d running\n", m_StillRunning);
         struct timeval timeout;
         int rc; // select() return code
@@ -140,11 +151,23 @@ void HttpService::EventLoop() {
        
 }
 
-size_t HttpService::WriteData(char* data, size_t size, size_t nmemb, std::string* writerData) {
-    if (writerData == NULL)
+size_t HttpService::WriteData(void* contents, size_t size, size_t nmemb, std::string* userp) {
+    size_t realsize = size * nmemb;
+
+    try {
+        userp->append((char*)contents, realsize);
+    }
+    catch (std::bad_alloc& e) {
+        printf("asdf\n");
+    }
+
+    return realsize;
+
+
+    /*if (writerData == NULL)
         return 0;
 
     writerData->append(data, size * nmemb);
 
-    return size * nmemb;
+    return size * nmemb;*/
 }

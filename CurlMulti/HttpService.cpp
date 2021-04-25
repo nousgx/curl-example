@@ -1,6 +1,6 @@
 #include "HttpService.h"
 #include <memory>
-#include <iostream>
+
 
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -36,15 +36,14 @@ std::future<std::string> HttpService::GetAsync() {
 
     std::promise<std::string> promise;
 
-    temp.handle = handle;
-    temp.promise = std::move(promise);
+    auto temp = std::make_shared<HttpRequestFuture>(handle, std::move(promise));
 
     // Set options
     curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
     curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
 
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp.str));
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp->str));
 
     // Add the handle to the multi stack
     curl_multi_add_handle(m_pMultiHandle, handle);
@@ -52,31 +51,12 @@ std::future<std::string> HttpService::GetAsync() {
     // Perform the action
     curl_multi_perform(m_pMultiHandle, &m_StillRunning);
 
-    return temp.promise.get_future();
+    m_Callbacks.push_back(temp);
+
+    std::cout << "Use count: " << temp.use_count() << "\n";
+
+    return temp->promise.get_future();
 }
-
-void HttpService::GetVoid() {
-    CURL* handle = SetupRequest();
-
-    HttpRequest req;
-    req.handle = handle;
-
-    // temp = req;
-
-    // Set options
-    curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
-    curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
-
-    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp.str));
-
-    // Add the handle to the multi stack
-    curl_multi_add_handle(m_pMultiHandle, handle);
-
-    // Perform the action
-    curl_multi_perform(m_pMultiHandle, &m_StillRunning);
-}
-
 void HttpService::PostAsync() {
 
 }
@@ -108,7 +88,18 @@ void HttpService::EventLoop() {
 
                 //std::cout << temp.str << "\n";
 
-                temp.promise.set_value(temp.str);
+                for (auto it = m_Callbacks.begin(); it != m_Callbacks.end();) {
+                    if ((*it)->handle == e) {
+                        std::cout << "Inside event loop use count: " << it->use_count() << "\n";
+
+                        (*it)->Callback();
+                        
+                        // Remove this since completed
+                        m_Callbacks.erase(it);
+                        break;
+                    }
+                }
+
 
                 // Cleanup after calling the callback
                 curl_multi_remove_handle(m_pMultiHandle, e);

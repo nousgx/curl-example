@@ -17,6 +17,7 @@ public:
     //std::future<std::string> GetAsync();
     //void GetVoid();
     std::future<std::string> GetAsync();
+    void GetAsync(std::function<void(std::string)> callback);
     void PostAsync();
 
 private:
@@ -54,6 +55,19 @@ private:
         }
     };
 
+    struct HttpRequestCallback : public HttpRequest {
+        std::function<void(std::string)> callback;
+
+        HttpRequestCallback(CURL* handle, std::function<void(std::string)> callback)
+            : HttpRequest(handle) {
+            this->callback = std::move(callback);
+        }
+
+        void Callback() override {
+            callback(str);
+        }
+    };
+
 
     std::thread m_EventThread;
 
@@ -63,6 +77,9 @@ private:
     CURLM* m_pMultiHandle;
 
     int m_StillRunning; // Number of running handles
+
+    int m_Run;
+    int m_Transfers;
 
     CURL* SetupRequest();
     void FinishRequest(CURL* handle);

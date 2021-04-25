@@ -4,6 +4,7 @@
 #include <iostream>
 #include "HttpService.h"
 
+
 int main()
 {
     std::cout << "Hello World!\n";
@@ -13,6 +14,9 @@ int main()
     std::future<std::string> f1 = httpService.GetAsync();
 
     std::cout << f1.get() << "\n";
+
+    httpService.GetAsync([](std::string a) { std::cout << "Testing callback\n" << "Received: string\n\t" << a; });
+
 
     //httpService.GetVoid();
 
@@ -24,11 +28,8 @@ int main()
     catch (const std::future_error & e) {
         std::cout << "Caught a future_error with code\"" << e.code() << "\"\nMessage: \"" << e.what() << "\"\n";
     }*/
-
-
-    Sleep(100000);
-
     httpService.Cleanup(); // or HttpService::Get().Cleanup();
+    curl_global_cleanup();
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

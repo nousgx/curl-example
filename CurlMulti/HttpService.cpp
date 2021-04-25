@@ -19,11 +19,14 @@ HttpService::HttpService()  {
     // Set variables
     m_pMultiHandle = curl_multi_init();
     m_StillRunning = 0;
+    m_Run = 1;
 
     m_EventThread = std::thread(&HttpService::EventLoop, this);
 }
 
 void HttpService::Cleanup() {
+    m_Run = 0;
+
     // Wait for the thread to finish execution
     m_EventThread.join();
 
@@ -52,11 +55,43 @@ std::future<std::string> HttpService::GetAsync() {
     curl_multi_perform(m_pMultiHandle, &m_StillRunning);
 
     m_Callbacks.push_back(temp);
+    m_Transfers++;
 
     std::cout << "Use count: " << temp.use_count() << "\n";
 
     return temp->promise.get_future();
 }
+
+void HttpService::GetAsync(std::function<void(std::string)> callback) {
+    CURL* handle = SetupRequest();
+
+    if (!handle) {
+        std::cout << "NULL Handle!!!\n";
+    }
+
+    std::promise<std::string> promise;
+
+    auto temp = std::make_shared<HttpRequestCallback>(handle, std::move(callback));
+
+    // Set options
+    curl_easy_setopt(handle, CURLOPT_URL, "http://localhost/");
+    curl_easy_setopt(handle, CURLOPT_PORT, 8000L);
+
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &HttpService::WriteData); //working
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &(temp->str));
+
+    // Add the handle to the multi stack
+    curl_multi_add_handle(m_pMultiHandle, handle);
+
+    // Perform the action
+    curl_multi_perform(m_pMultiHandle, &m_StillRunning);
+
+    m_Callbacks.push_back(temp);
+    m_Transfers++;
+
+    std::cout << "Use count: " << temp.use_count() << "\n";
+}
+
 void HttpService::PostAsync() {
 
 }
@@ -77,7 +112,7 @@ void HttpService::EventLoop() {
     CURLMsg* msg;
     int msgs_left = -1;
 
-    while (1) {
+    while (m_Run || m_Transfers) {
         // Get which messages are done
         while ((msg = curl_multi_info_read(m_pMultiHandle, &msgs_left))) {
             if (msg->msg == CURLMSG_DONE) {
@@ -96,6 +131,7 @@ void HttpService::EventLoop() {
                         
                         // Remove this since completed
                         m_Callbacks.erase(it);
+                        m_Transfers--;
                         break;
                     }
                 }
